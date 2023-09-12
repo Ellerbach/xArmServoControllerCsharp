@@ -6,6 +6,7 @@ using LibUsbDotNet.LibUsb;
 using LibUsbDotNet.Main;
 using System;
 using System.Runtime.InteropServices;
+using UnitsNet;
 
 namespace xArmServo
 {
@@ -103,12 +104,32 @@ namespace xArmServo
         /// Stops a servo.
         /// </summary>
         /// <param name="servoId">The servo ID should be between 1 and 6.</param>
-        public void StopServo(byte servoId)
+        public void Stop(Servo servoId)
         {
             var buffer = new byte[2];
             buffer[0] = 1;
-            buffer[1] = servoId;
+            buffer[1] = (byte)servoId;
             Send(Command.ServoStop, buffer);
+        }
+
+        /// <summary>
+        /// Stops multiple servos.
+        /// </summary>
+        /// <param name="servoIds">The servo ID array, each servo should be between 1 and 6.</param>
+        public void Stop(Servo[] servoIds)
+        {
+            var buffer = new byte[servoIds.Length + 1];
+            buffer[0] = (byte)servoIds.Length;
+            servoIds.CopyTo(buffer, 1);
+            Send(Command.ServoStop, buffer);
+        }
+
+        /// <summary>
+        /// Stops all servos.
+        /// </summary>
+        public void StopAll()
+        {
+            Send(Command.ServoStop, new byte[] { 6, 1, 2, 3, 4, 5, 6 });
         }
 
         /// <summary>
@@ -118,14 +139,14 @@ namespace xArmServo
         /// <param name="position">The position, depending on the servo, should be between 0 and 1000.</param>
         /// <param name="duration">The duration in milliseconds.</param>
         /// <param name="wait">If true, the method will wait for the duration before returning.</param>
-        public void SetPosition(byte servoId, ushort position, ushort duration = 1000, bool wait = true)
+        public void SetPosition(Servo servoId, ushort position, ushort duration = 1000, bool wait = true)
         {
             var buffer = new byte[6];
             int idx = 0;
             buffer[idx++] = 1;
             buffer[idx++] = (byte)(duration & 0xff);
             buffer[idx++] = (byte)(duration >> 8);
-            buffer[idx++] = servoId;
+            buffer[idx++] = (byte)servoId;
             buffer[idx++] = (byte)(position & 0xff);
             buffer[idx++] = (byte)(position >> 8);
             Send(Command.ServoMove, buffer);
@@ -142,7 +163,7 @@ namespace xArmServo
         /// <param name="positions">The positions of the servos</param>
         /// <param name="duration">The duration in milliseconds.</param>
         /// <param name="wait">If true, the method will wait for the duration before returning./param>
-        public void SetPositions(byte[] servoIds, ushort[] positions, ushort duration = 1000, bool wait = true)
+        public void SetPositions(Servo[] servoIds, ushort[] positions, ushort duration = 1000, bool wait = true)
         {
             var buffer = new byte[3 + servoIds.Length * 3];
             int idx = 0;
@@ -151,7 +172,7 @@ namespace xArmServo
             buffer[idx++] = (byte)(duration >> 8);
             for (int i = 0; i < servoIds.Length; i++)
             {
-                buffer[idx++] = servoIds[i];
+                buffer[idx++] = (byte)servoIds[i];
                 buffer[idx++] = (byte)(positions[i] & 0xff);
                 buffer[idx++] = (byte)(positions[i] >> 8);
             }
@@ -168,17 +189,17 @@ namespace xArmServo
         /// </summary>
         /// <param name="servoId">The servo ID should be between 1 and 6.</param>
         /// <returns>The position of the servo.</returns>
-        public short GetPosition(byte servoId)
+        public short GetPosition(Servo servoId)
         {
             var buffer = new byte[2];
             buffer[0] = 1;
-            buffer[1] = servoId;
+            buffer[1] = (byte)servoId;
             Send(Command.GetServoPosition, buffer);
             var readBuffer = new byte[64];
             _endpointReader.Read(readBuffer, ReadWriteTimeout, out var bytesRead);
             if ((bytesRead > 0) && (readBuffer[0] == SIGNATURE)
                 && (readBuffer[1] == SIGNATURE) && (readBuffer[3] == (byte)Command.GetServoPosition)
-                && (readBuffer[4] == 1) && (readBuffer[5] == servoId))
+                && (readBuffer[4] == 1) && (readBuffer[5] == (byte)servoId))
             {
                 return (short)(readBuffer[7] * 256 + readBuffer[6]);
             }
@@ -191,7 +212,7 @@ namespace xArmServo
         /// </summary>
         /// <param name="servoIds">>The servo ID array, each servo should be between 1 and 6.</param>
         /// <returns>An array containing the positions of the servos.</returns>
-        public short[] GetPositions(byte[] servoIds)
+        public short[] GetPositions(Servo[] servoIds)
         {
             var buffer = new byte[servoIds.Length + 1];
             buffer[0] = (byte)servoIds.Length;
@@ -220,17 +241,17 @@ namespace xArmServo
         /// Gets the battery level in volts.
         /// </summary>
         /// <returns>The battery voltage.</returns>
-        public double GetBatteryLevel()
+        public ElectricPotential GetBatteryLevel()
         {
             Send(Command.BatteryVoltage, new byte[0]);
             var readBuffer = new byte[64];
             _endpointReader.Read(readBuffer, ReadWriteTimeout, out var bytesRead);
             if ((bytesRead > 0) && (readBuffer[0] == SIGNATURE) && (readBuffer[1] == SIGNATURE) && (readBuffer[3] == (byte)Command.BatteryVoltage))
             {
-                return (readBuffer[5] * 256 + readBuffer[4]) / 1000.0;
+                return ElectricPotential.FromMillivolts(readBuffer[5] * 256 + readBuffer[4]);
             }
 
-            return -1;
+            return ElectricPotential.FromVolts(-1);
         }
 
         private void Send(Command cmd, byte[] data)
