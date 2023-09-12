@@ -118,7 +118,7 @@ namespace xArmServo
         /// <param name="position">The position, depending on the servo, should be between 0 and 1000.</param>
         /// <param name="duration">The duration in milliseconds.</param>
         /// <param name="wait">If true, the method will wait for the duration before returning.</param>
-        public void SetPosition(byte servoId, ushort position, ushort duration = 1000, bool wait = false)
+        public void SetPosition(byte servoId, ushort position, ushort duration = 1000, bool wait = true)
         {
             var buffer = new byte[6];
             int idx = 0;
@@ -142,7 +142,7 @@ namespace xArmServo
         /// <param name="positions">The positions of the servos</param>
         /// <param name="duration">The duration in milliseconds.</param>
         /// <param name="wait">If true, the method will wait for the duration before returning./param>
-        public void SetPositions(byte[] servoIds, ushort[] positions, ushort duration = 1000, bool wait = false)
+        public void SetPositions(byte[] servoIds, ushort[] positions, ushort duration = 1000, bool wait = true)
         {
             var buffer = new byte[3 + servoIds.Length * 3];
             int idx = 0;
