@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="LibUsbDotNet" Version="3.0.102-alpha" />
+    <PackageReference Include="UnitsNet" Version="5.32.0" />
   </ItemGroup>
 
 </Project>
