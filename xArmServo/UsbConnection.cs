@@ -9,6 +9,9 @@ using System.Runtime.InteropServices;
 
 namespace xArmServo
 {
+    /// <summary>
+    /// Defines the basic operations for handling a USB connection.
+    /// </summary>
     public class UsbConnection : IConnection
     {
 
@@ -62,16 +65,22 @@ namespace xArmServo
             return selectedDevice.ToArray();
         }
 
+        /// <summary>
+        /// Initializes a new instance of the UsbConnection class.
+        /// </summary>
+        /// <param name="device">The USB device used for the connection.</param>
         public UsbConnection(IUsbDevice device)
         {
             _controller = device;
         }
 
+        /// <inheritdoc/>
         public void Close()
         {
             _controller.Close();
         }
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             _controller.ReleaseInterface(_controller.Configs[0].Interfaces[0].Number);
@@ -79,6 +88,7 @@ namespace xArmServo
             _controller.Dispose();
         }
 
+        /// <inheritdoc/>
         public void Open()
         {
             _controller.Open();
@@ -101,6 +111,7 @@ namespace xArmServo
             _endpointReader.Read(readBuffer, ReadWriteTimeout, out var bytesRead);
         }
 
+        /// <inheritdoc/>
         public int Read(byte[] data)
         {
             var readBuffer = new byte[64];
@@ -113,6 +124,7 @@ namespace xArmServo
             return bytesRead;
         }
 
+        /// <inheritdoc/>
         public void Write(byte[] data)
         {
             if (data.Length > 64)
