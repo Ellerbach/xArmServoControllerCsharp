@@ -5,11 +5,12 @@ using UnitsNet;
 using xArmServo;
 using xArmServo.Coordinate;
 
-//var controller = UsbConnection.GetFirstPortal();
-var controller = SerialCommunication.Create("COM10");
+var controller = UsbConnection.GetFirstPortal();
+//var controller = SerialCommunication.Create("COM10");
 Console.WriteLine($"Controller found, and open");
 
-TestBaseMovement();
+//TestBaseMovement();
+TestAbsolute();
 
 controller.StopAll();
 
@@ -25,6 +26,8 @@ void TestAbsolute()
     positionMove.MoveTo(new Position() { X = Length.FromMillimeters(0), Y = Length.FromMillimeters(428), Z = Length.FromMillimeters(0) });
 
     positionMove.MoveTo(new Position() { X = Length.FromMillimeters(428), Y = Length.FromMillimeters(0), Z = Length.FromMillimeters(0) });
+
+    positionMove.MoveTo(new Position() { X = Length.FromMillimeters(0), Y = Length.FromMillimeters(0), Z = Length.FromMillimeters(428) });
 }
 
 void TestBaseMovement()
