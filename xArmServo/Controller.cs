@@ -12,58 +12,9 @@ namespace xArmServo
 {
     public class Controller
     {
-        // Constants
-        private const int ProductId = 0x5750;
-        private const int VendorId = 0x0483;
-        private const int ReadWriteTimeout = 1000;
-        private const int ReceiveTimeout = 2000;
-
         private const byte SIGNATURE = 0x55;
 
-        // This needs to be static to keep the context otherwise, the app will close it
-        private static UsbContext context = null;
-
-        // Class variables
-        private IUsbDevice _controller;
-        private UsbEndpointReader _endpointReader;
-        private UsbEndpointWriter _endpointWriter;
-
-        /// <summary>
-        /// Gets the first of default Controller.
-        /// </summary>
-        /// <returns>A Controller</returns>
-        public static Controller GetFirstPortal()
-        {
-            var portals = GetControllers();
-
-            if (portals.Length == 0)
-            {
-                throw new Exception("No Controller found.");
-            }
-
-            return new Controller(portals[0]);
-        }
-
-        /// <summary>
-        /// Gets all the available USB device that matches the Controller.
-        /// </summary>
-        /// <returns>Array of USB devices.</returns>
-        public static IUsbDevice[] GetControllers()
-        {
-            context ??= new UsbContext();
-#if DEBUG
-            context.SetDebugLevel(LogLevel.Info);
-#else
-            context.SetDebugLevel(LogLevel.Error);
-#endif
-            //Get a list of all connected devices
-            var usbDeviceCollection = context.List();
-
-            //Narrow down the device by vendor and pid
-            var selectedDevice = usbDeviceCollection.Where(d => d.ProductId == ProductId && d.VendorId == VendorId);
-
-            return selectedDevice.ToArray();
-        }
+        private IConnection _controller;
 
         /// <summary>
         /// Gets the ID.
@@ -75,29 +26,12 @@ namespace xArmServo
         /// </summary>
         /// <param name="device">A valid Lego Dimensions instance.</param>
         /// <param name="id">An ID for this device, can be handy if you manage multiple ones.</param>
-        public Controller(IUsbDevice device, int id = 0)
+        public Controller(IConnection device, int id = 0)
         {
             _controller = device;
             Id = id;
             // Open the device
             _controller.Open();
-
-            // Non Windows OS need to detach the kernel driver
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                Imports.SetAutoDetachKernelDriver(_controller.DeviceHandle, 1);
-            }
-
-            //Get the first config number of the interface
-            _controller.ClaimInterface(_controller.Configs[0].Interfaces[0].Number);
-
-            //Open up the endpoints
-            _endpointWriter = _controller.OpenEndpointWriter(WriteEndpointID.Ep01);
-            _endpointReader = _controller.OpenEndpointReader(ReadEndpointID.Ep01);
-
-            // Read the first 64 bytes to clean the buffer
-            var readBuffer = new byte[64];
-            _endpointReader.Read(readBuffer, ReadWriteTimeout, out var bytesRead);
         }
 
         /// <summary>
@@ -195,13 +129,11 @@ namespace xArmServo
             buffer[0] = 1;
             buffer[1] = (byte)servoId;
             Send(Command.GetServoPosition, buffer);
-            var readBuffer = new byte[64];
-            _endpointReader.Read(readBuffer, ReadWriteTimeout, out var bytesRead);
-            if ((bytesRead > 0) && (readBuffer[0] == SIGNATURE)
-                && (readBuffer[1] == SIGNATURE) && (readBuffer[3] == (byte)Command.GetServoPosition)
-                && (readBuffer[4] == 1) && (readBuffer[5] == (byte)servoId))
+
+            var readBuffer = Receive(Command.GetServoPosition, 4);
+            if (readBuffer.Length >= 4)
             {
-                return (short)(readBuffer[7] * 256 + readBuffer[6]);
+                return (short)(readBuffer[3] * 256 + readBuffer[2]);
             }
 
             return -1;
@@ -218,19 +150,19 @@ namespace xArmServo
             buffer[0] = (byte)servoIds.Length;
             servoIds.CopyTo(buffer, 1);
             Send(Command.GetServoPosition, buffer);
-            var readBuffer = new byte[64];
-            _endpointReader.Read(readBuffer, ReadWriteTimeout, out var bytesRead);
+            var readBuffer = Receive(Command.GetServoPosition, servoIds.Length * 3 + 1);
+
             short[] resp = new short[servoIds.Length];
             for (int i = 0; i < resp.Length; i++)
             {
                 resp[i] = -1;
             }
 
-            if ((bytesRead > 0) && (readBuffer[0] == SIGNATURE) && (readBuffer[1] == SIGNATURE) && (readBuffer[3] == (byte)Command.GetServoPosition))
+            if (readBuffer.Length >= servoIds.Length * 3 + 1)
             {
                 for (int i = 0; i < servoIds.Length; i++)
                 {
-                    resp[i] = (short)(readBuffer[7 + i * 3] * 256 + readBuffer[6 + i * 3]);
+                    resp[i] = (short)(readBuffer[3 + i * 3] * 256 + readBuffer[2 + i * 3]);
                 }
             }
 
@@ -244,11 +176,10 @@ namespace xArmServo
         public ElectricPotential GetBatteryLevel()
         {
             Send(Command.BatteryVoltage, new byte[0]);
-            var readBuffer = new byte[64];
-            _endpointReader.Read(readBuffer, ReadWriteTimeout, out var bytesRead);
-            if ((bytesRead > 0) && (readBuffer[0] == SIGNATURE) && (readBuffer[1] == SIGNATURE) && (readBuffer[3] == (byte)Command.BatteryVoltage))
+            var readBuffer = Receive(Command.BatteryVoltage, 2);
+            if (readBuffer.Length >= 2)
             {
-                return ElectricPotential.FromMillivolts(readBuffer[5] * 256 + readBuffer[4]);
+                return ElectricPotential.FromMillivolts(readBuffer[1] * 256 + readBuffer[0]);
             }
 
             return ElectricPotential.FromVolts(-1);
@@ -256,22 +187,33 @@ namespace xArmServo
 
         private void Send(Command cmd, byte[] data)
         {
-            //var buffer = new byte[data.Length + 4];
-            var buffer = new byte[64];
+            var buffer = new byte[data.Length + 4];
             int idx = 0;
             buffer[idx++] = SIGNATURE;
             buffer[idx++] = SIGNATURE;
             buffer[idx++] = (byte)(data.Length + 2);
             buffer[idx++] = (byte)cmd;
             Array.Copy(data, 0, buffer, idx, data.Length);
-            _endpointWriter.Write(buffer, ReadWriteTimeout, out var bytesWritten);
+            _controller.Write(buffer);
+        }
+
+        private byte[] Receive(Command cmd, int size)
+        {
+            var readBuffer = new byte[size + 4];
+            var bytesRead = _controller.Read(readBuffer);
+            if ((bytesRead > 0) && (readBuffer[0] == SIGNATURE) && (readBuffer[1] == SIGNATURE) && (readBuffer[3] == (byte)cmd))
+            {
+                var resp = new byte[readBuffer[2] - 2];
+                Array.Copy(readBuffer, 4, resp, 0, resp.Length);
+                return resp;
+            }
+
+            return new byte[0];
         }
 
         /// <inheritdoc/>
         public void Dispose()
         {
-            _controller.ReleaseInterface(_controller.Configs[0].Interfaces[0].Number);
-            _controller.Close();
             _controller.Dispose();
         }
     }

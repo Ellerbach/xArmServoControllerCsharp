@@ -3,7 +3,7 @@
 
 using xArmServo;
 
-var controller = Controller.GetFirstPortal();
+var controller = UsbConnection.GetFirstPortal();
 Console.WriteLine($"Controller found, and open");
 
 var batt = controller.GetBatteryLevel();
@@ -31,6 +31,11 @@ for (int i = 0; i < poss.Length; i++)
 //{
 //    controller.Stop((Servo)i);
 //}
+
+Console.WriteLine("Moving servo 6 from 0 to 1000 very quickly");
+controller.SetPosition(Servo.S6, 0, 300);
+Thread.Sleep(500);
+controller.SetPosition(Servo.S6, 1000, 300);
 
 controller.StopAll();
 
