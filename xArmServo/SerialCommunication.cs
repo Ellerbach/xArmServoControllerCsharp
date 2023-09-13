@@ -19,6 +19,8 @@ namespace xArmServo
         public static Controller Create(string portName)
         {
             var serialPort = new SerialPort(portName, 9600, Parity.None, 8, StopBits.One);
+            serialPort.ReadTimeout = 1000;
+
             var connection = new SerialCommunication(serialPort);
             return new Controller(connection);
         }
@@ -41,7 +43,7 @@ namespace xArmServo
         /// <inheritdoc/>
         public void Dispose()
         {
-            throw new NotImplementedException();
+            _serialPort.Dispose();
         }
 
         /// <inheritdoc/>
@@ -53,6 +55,12 @@ namespace xArmServo
         /// <inheritdoc/>
         public int Read(byte[] data)
         {
+            CancellationTokenSource cs = new CancellationTokenSource(_serialPort.ReadTimeout);
+            while ((_serialPort.BytesToRead <= data.Length) && (!cs.Token.IsCancellationRequested))
+            {
+                cs.Token.WaitHandle.WaitOne(20);
+            }
+
             return _serialPort.Read(data, 0, data.Length);
         }
 
