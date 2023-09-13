@@ -12,7 +12,7 @@ namespace xArmServo
     /// <summary>
     /// Defines the basic operations for handling a USB connection.
     /// </summary>
-    public class UsbConnection : IConnection
+    public class UsbConnection : IConnection, IDisposable
     {
 
         // Constants
