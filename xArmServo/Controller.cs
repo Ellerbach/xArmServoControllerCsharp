@@ -10,7 +10,7 @@ using UnitsNet;
 
 namespace xArmServo
 {
-    public class Controller
+    public class Controller: IConnection
     {
         private const byte SIGNATURE = 0x55;
 
@@ -185,7 +185,7 @@ namespace xArmServo
             return ElectricPotential.FromVolts(-1);
         }
 
-        private void Send(Command cmd, byte[] data)
+        internal void Send(Command cmd, byte[] data)
         {
             var buffer = new byte[data.Length + 4];
             int idx = 0;
@@ -197,7 +197,7 @@ namespace xArmServo
             _controller.Write(buffer);
         }
 
-        private byte[] Receive(Command cmd, int size)
+        internal byte[] Receive(Command cmd, int size)
         {
             var readBuffer = new byte[size + 4];
             var bytesRead = _controller.Read(readBuffer);
@@ -215,6 +215,30 @@ namespace xArmServo
         public void Dispose()
         {
             _controller.Dispose();
+        }
+
+        /// <inheritdoc/>
+        public void Close()
+        {
+            // Nothing to do, we won't really close it, it will be closed at Dispose
+        }
+
+        /// <inheritdoc/>
+        public void Open()
+        {
+            // Nothing to do, it's always open
+        }
+
+        /// <inheritdoc/>
+        public void Write(byte[] data)
+        {
+            Send(Command.ServoRaw, data);
+        }
+
+        /// <inheritdoc/>
+        public int Read(byte[] data)
+        {
+            return Receive(Command.ServoRaw, data.Length).Length;
         }
     }
 }
